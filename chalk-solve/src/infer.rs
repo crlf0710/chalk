@@ -49,7 +49,7 @@ impl<I: Interner> InferenceTable<I> {
     pub(crate) fn from_canonical<T>(
         interner: &I,
         num_universes: usize,
-        canonical: &Canonical<T>,
+        canonical: &Canonical<I, T>,
     ) -> (Self, Substitution<I>, T)
     where
         T: Fold<I, Result = T> + Clone,
@@ -61,7 +61,7 @@ impl<I: Interner> InferenceTable<I> {
             table.new_universe();
         }
 
-        let subst = table.fresh_subst(interner, &canonical.binders);
+        let subst = table.fresh_subst(interner, canonical.binders.as_slice(interner));
         let value = subst.apply(&canonical.value, interner);
         // let value = canonical.value.fold_with(&mut &subst, 0).unwrap();
 

@@ -68,9 +68,9 @@ pub struct TruncatingInferenceTable<I: Interner> {
 }
 
 impl<I: Interner> context::Context for SlgContext<I> {
-    type CanonicalGoalInEnvironment = Canonical<InEnvironment<Goal<I>>>;
-    type CanonicalExClause = Canonical<ExClause<Self>>;
-    type UCanonicalGoalInEnvironment = UCanonical<InEnvironment<Goal<I>>>;
+    type CanonicalGoalInEnvironment = Canonical<I, InEnvironment<Goal<I>>>;
+    type CanonicalExClause = Canonical<I, ExClause<Self>>;
+    type UCanonicalGoalInEnvironment = UCanonical<I, InEnvironment<Goal<I>>>;
     type UniverseMap = UniverseMap;
     type InferenceNormalizedSubst = Substitution<I>;
     type Solution = Solution<I>;
@@ -82,8 +82,8 @@ impl<I: Interner> context::Context for SlgContext<I> {
     type Parameter = Parameter<I>;
     type ProgramClause = ProgramClause<I>;
     type ProgramClauses = ProgramClauses<I>;
-    type CanonicalConstrainedSubst = Canonical<ConstrainedSubst<I>>;
-    type CanonicalAnswerSubst = Canonical<AnswerSubst<I>>;
+    type CanonicalConstrainedSubst = Canonical<I, ConstrainedSubst<I>>;
+    type CanonicalAnswerSubst = Canonical<I, AnswerSubst<I>>;
     type GoalInEnvironment = InEnvironment<Goal<I>>;
     type Substitution = Substitution<I>;
     type RegionConstraint = InEnvironment<Constraint<I>>;
@@ -95,36 +95,36 @@ impl<I: Interner> context::Context for SlgContext<I> {
     }
 
     fn inference_normalized_subst_from_ex_clause(
-        canon_ex_clause: &Canonical<ExClause<SlgContext<I>>>,
+        canon_ex_clause: &Canonical<I, ExClause<SlgContext<I>>>,
     ) -> &Substitution<I> {
         &canon_ex_clause.value.subst
     }
 
-    fn empty_constraints(ccs: &Canonical<AnswerSubst<I>>) -> bool {
+    fn empty_constraints(ccs: &Canonical<I, AnswerSubst<I>>) -> bool {
         ccs.value.constraints.is_empty()
     }
 
-    fn inference_normalized_subst_from_subst(ccs: &Canonical<AnswerSubst<I>>) -> &Substitution<I> {
+    fn inference_normalized_subst_from_subst(ccs: &Canonical<I, AnswerSubst<I>>) -> &Substitution<I> {
         &ccs.value.subst
     }
 
     fn canonical(
-        u_canon: &UCanonical<InEnvironment<Goal<I>>>,
-    ) -> &Canonical<InEnvironment<Goal<I>>> {
+        u_canon: &UCanonical<I, InEnvironment<Goal<I>>>,
+    ) -> &Canonical<I, InEnvironment<Goal<I>>> {
         &u_canon.canonical
     }
 
-    fn has_delayed_subgoals(canonical_subst: &Canonical<AnswerSubst<I>>) -> bool {
+    fn has_delayed_subgoals(canonical_subst: &Canonical<I, AnswerSubst<I>>) -> bool {
         !canonical_subst.value.delayed_subgoals.is_empty()
     }
 
-    fn num_universes(u_canon: &UCanonical<InEnvironment<Goal<I>>>) -> usize {
+    fn num_universes(u_canon: &UCanonical<I, InEnvironment<Goal<I>>>) -> usize {
         u_canon.universes
     }
 
     fn canonical_constrained_subst_from_canonical_constrained_answer(
-        canonical_subst: &Canonical<AnswerSubst<I>>,
-    ) -> Canonical<ConstrainedSubst<I>> {
+        canonical_subst: &Canonical<I, AnswerSubst<I>>,
+    ) -> Canonical<I, ConstrainedSubst<I>> {
         Canonical {
             binders: canonical_subst.binders.clone(),
             value: ConstrainedSubst {
@@ -152,23 +152,23 @@ impl<I: Interner> context::Context for SlgContext<I> {
 }
 
 impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me, I> {
-    fn is_coinductive(&self, goal: &UCanonical<InEnvironment<Goal<I>>>) -> bool {
+    fn is_coinductive(&self, goal: &UCanonical<I, InEnvironment<Goal<I>>>) -> bool {
         goal.is_coinductive(self.program)
     }
 
     fn map_goal_from_canonical(
         &self,
         map: &UniverseMap,
-        value: &Canonical<InEnvironment<Goal<I>>>,
-    ) -> Canonical<InEnvironment<Goal<I>>> {
+        value: &Canonical<I, InEnvironment<Goal<I>>>,
+    ) -> Canonical<I, InEnvironment<Goal<I>>> {
         map.map_from_canonical(self.program.interner(), value)
     }
 
     fn map_subst_from_canonical(
         &self,
         map: &UniverseMap,
-        value: &Canonical<AnswerSubst<I>>,
-    ) -> Canonical<AnswerSubst<I>> {
+        value: &Canonical<I, AnswerSubst<I>>,
+    ) -> Canonical<I, AnswerSubst<I>> {
         map.map_from_canonical(self.program.interner(), value)
     }
 
@@ -227,7 +227,7 @@ impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me,
 
     fn instantiate_ucanonical_goal(
         &self,
-        arg: &UCanonical<InEnvironment<Goal<I>>>,
+        arg: &UCanonical<I, InEnvironment<Goal<I>>>,
     ) -> (
         TruncatingInferenceTable<I>,
         Substitution<I>,
@@ -243,7 +243,7 @@ impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me,
     fn instantiate_ex_clause(
         &self,
         num_universes: usize,
-        canonical_ex_clause: &Canonical<ExClause<SlgContext<I>>>,
+        canonical_ex_clause: &Canonical<I, ExClause<SlgContext<I>>>,
     ) -> (TruncatingInferenceTable<I>, ExClause<SlgContext<I>>) {
         let (infer, _subst, ex_cluse) = InferenceTable::from_canonical(
             self.program.interner(),
@@ -257,7 +257,7 @@ impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me,
     fn instantiate_answer_subst(
         &self,
         num_universes: usize,
-        answer: &Canonical<AnswerSubst<I>>,
+        answer: &Canonical<I, AnswerSubst<I>>,
     ) -> (
         TruncatingInferenceTable<I>,
         Substitution<I>,
@@ -280,15 +280,15 @@ impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me,
     fn constrained_subst_from_answer(
         &self,
         answer: CompleteAnswer<SlgContext<I>>,
-    ) -> Canonical<ConstrainedSubst<I>> {
+    ) -> Canonical<I, ConstrainedSubst<I>> {
         let CompleteAnswer { subst, .. } = answer;
         subst
     }
 
     fn identity_constrained_subst(
         &self,
-        goal: &UCanonical<InEnvironment<Goal<I>>>,
-    ) -> Canonical<ConstrainedSubst<I>> {
+        goal: &UCanonical<I, InEnvironment<Goal<I>>>,
+    ) -> Canonical<I, ConstrainedSubst<I>> {
         let (mut infer, subst, _) = InferenceTable::from_canonical(
             self.program.interner(),
             goal.universes,
@@ -315,8 +315,8 @@ impl<'me, I: Interner> context::ContextOps<SlgContext<I>> for SlgContextOps<'me,
 
     fn is_trivial_substitution(
         &self,
-        u_canon: &UCanonical<InEnvironment<Goal<I>>>,
-        canonical_subst: &Canonical<AnswerSubst<I>>,
+        u_canon: &UCanonical<I, InEnvironment<Goal<I>>>,
+        canonical_subst: &Canonical<I, AnswerSubst<I>>,
     ) -> bool {
         let interner = self.interner();
         u_canon.is_trivial_substitution(interner, canonical_subst)
@@ -410,7 +410,7 @@ impl<I: Interner> context::UnificationOps<SlgContext<I>> for TruncatingInference
         &mut self,
         interner: &I,
         value: &InEnvironment<Goal<I>>,
-    ) -> (UCanonical<InEnvironment<Goal<I>>>, UniverseMap) {
+    ) -> (UCanonical<I, InEnvironment<Goal<I>>>, UniverseMap) {
         let canonicalized_goal = self.infer.canonicalize(interner, value).quantified;
         let UCanonicalized {
             quantified,
@@ -423,7 +423,7 @@ impl<I: Interner> context::UnificationOps<SlgContext<I>> for TruncatingInference
         &mut self,
         interner: &I,
         value: &ExClause<SlgContext<I>>,
-    ) -> Canonical<ExClause<SlgContext<I>>> {
+    ) -> Canonical<I, ExClause<SlgContext<I>>> {
         self.infer.canonicalize(interner, value).quantified
     }
 
@@ -432,7 +432,7 @@ impl<I: Interner> context::UnificationOps<SlgContext<I>> for TruncatingInference
         interner: &I,
         subst: Substitution<I>,
         constraints: Vec<InEnvironment<Constraint<I>>>,
-    ) -> Canonical<ConstrainedSubst<I>> {
+    ) -> Canonical<I, ConstrainedSubst<I>> {
         self.infer
             .canonicalize(interner, &ConstrainedSubst { subst, constraints })
             .quantified
@@ -444,7 +444,7 @@ impl<I: Interner> context::UnificationOps<SlgContext<I>> for TruncatingInference
         subst: Substitution<I>,
         constraints: Vec<InEnvironment<Constraint<I>>>,
         delayed_subgoals: Vec<InEnvironment<Goal<I>>>,
-    ) -> Canonical<AnswerSubst<I>> {
+    ) -> Canonical<I, AnswerSubst<I>> {
         self.infer
             .canonicalize(
                 interner,
@@ -496,11 +496,11 @@ fn into_ex_clause<I: Interner>(
 }
 
 trait SubstitutionExt<I: Interner> {
-    fn may_invalidate(&self, interner: &I, subst: &Canonical<Substitution<I>>) -> bool;
+    fn may_invalidate(&self, interner: &I, subst: &Canonical<I, Substitution<I>>) -> bool;
 }
 
 impl<I: Interner> SubstitutionExt<I> for Substitution<I> {
-    fn may_invalidate(&self, interner: &I, subst: &Canonical<Substitution<I>>) -> bool {
+    fn may_invalidate(&self, interner: &I, subst: &Canonical<I, Substitution<I>>) -> bool {
         self.iter(interner)
             .zip(subst.value.iter(interner))
             .any(|(new, current)| MayInvalidate { interner }.aggregate_parameters(new, current))

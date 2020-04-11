@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<T, I> Visit<I> for Canonical<T>
+impl<T, I> Visit<I> for Canonical<I, T>
 where
     T: Visit<I>,
     I: Interner,

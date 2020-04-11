@@ -10,8 +10,8 @@ impl<I: Interner> InferenceTable<I> {
     pub(crate) fn u_canonicalize<T: Fold<I> + Visit<I>>(
         &mut self,
         interner: &I,
-        value0: &Canonical<T>,
-    ) -> UCanonicalized<T::Result> {
+        value0: &Canonical<I, T>,
+    ) -> UCanonicalized<I, T::Result> {
         debug!("u_canonicalize({:#?})", value0);
 
         // First, find all the universes that appear in `value`.
@@ -37,11 +37,12 @@ impl<I: Interner> InferenceTable<I> {
                 DebruijnIndex::INNERMOST,
             )
             .unwrap();
-        let binders = value0
+        let binders = 
+        ParameterKindsWithUniverseIndex::from(interner,
+        value0
             .binders
-            .iter()
-            .map(|pk| pk.map(|ui| universes.map_universe_to_canonical(ui)))
-            .collect();
+            .iter(interner)
+            .map(|pk| pk.map(|ui| universes.map_universe_to_canonical(ui))));
 
         UCanonicalized {
             quantified: UCanonical {
@@ -57,9 +58,9 @@ impl<I: Interner> InferenceTable<I> {
 }
 
 #[derive(Debug)]
-pub(crate) struct UCanonicalized<T> {
+pub(crate) struct UCanonicalized<I: Interner, T> {
     /// The canonicalized result.
-    pub(crate) quantified: UCanonical<T>,
+    pub(crate) quantified: UCanonical<I, T>,
 
     /// A map between the universes in `quantified` and the original universes
     pub(crate) universes: UniverseMap,

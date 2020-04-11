@@ -32,7 +32,7 @@ impl<I: Interner> IsCoinductive<I> for Goal<I> {
     }
 }
 
-impl<I: Interner> IsCoinductive<I> for UCanonical<InEnvironment<Goal<I>>> {
+impl<I: Interner> IsCoinductive<I> for UCanonical<I, InEnvironment<Goal<I>>> {
     fn is_coinductive(&self, db: &dyn RustIrDatabase<I>) -> bool {
         self.canonical.value.goal.is_coinductive(db)
     }
