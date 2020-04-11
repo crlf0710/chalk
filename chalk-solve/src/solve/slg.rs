@@ -77,7 +77,7 @@ impl<I: Interner> context::Context for SlgContext<I> {
     type Environment = Environment<I>;
     type DomainGoal = DomainGoal<I>;
     type Goal = Goal<I>;
-    type BindersGoal = Binders<Goal<I>>;
+    type BindersGoal = Binders<I, Goal<I>>;
     type Parameter = Parameter<I>;
     type ProgramClause = ProgramClause<I>;
     type ProgramClauses = ProgramClauses<I>;
@@ -103,7 +103,9 @@ impl<I: Interner> context::Context for SlgContext<I> {
         ccs.value.constraints.is_empty()
     }
 
-    fn inference_normalized_subst_from_subst(ccs: &Canonical<I, AnswerSubst<I>>) -> &Substitution<I> {
+    fn inference_normalized_subst_from_subst(
+        ccs: &Canonical<I, AnswerSubst<I>>,
+    ) -> &Substitution<I> {
         &ccs.value.subst
     }
 
@@ -385,14 +387,18 @@ impl<I: Interner> context::TruncateOps<SlgContext<I>> for TruncatingInferenceTab
 impl<I: Interner> context::InferenceTable<SlgContext<I>> for TruncatingInferenceTable<I> {}
 
 impl<I: Interner> context::UnificationOps<SlgContext<I>> for TruncatingInferenceTable<I> {
-    fn instantiate_binders_universally(&mut self, interner: &I, arg: &Binders<Goal<I>>) -> Goal<I> {
+    fn instantiate_binders_universally(
+        &mut self,
+        interner: &I,
+        arg: &Binders<I, Goal<I>>,
+    ) -> Goal<I> {
         self.infer.instantiate_binders_universally(interner, arg)
     }
 
     fn instantiate_binders_existentially(
         &mut self,
         interner: &I,
-        arg: &Binders<Goal<I>>,
+        arg: &Binders<I, Goal<I>>,
     ) -> Goal<I> {
         self.infer.instantiate_binders_existentially(interner, arg)
     }

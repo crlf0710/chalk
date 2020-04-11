@@ -75,7 +75,7 @@ impl<'i, I: Interner> GoalBuilder<'i, I> {
     /// account for the new binder being created.
     pub fn forall<G, B, P>(
         &mut self,
-        binders: &Binders<B>,
+        binders: &Binders<I, B>,
         passthru: P,
         body: fn(&mut Self, Substitution<I>, &B, P::Result) -> G,
     ) -> Goal<I>
@@ -91,7 +91,7 @@ impl<'i, I: Interner> GoalBuilder<'i, I> {
     /// Like [`GoalBuilder::forall`], but for a `exists<Q0..Qn> { G }` goal.
     pub fn exists<G, B, P>(
         &mut self,
-        binders: &Binders<B>,
+        binders: &Binders<I, B>,
         passthru: P,
         body: fn(&mut Self, Substitution<I>, &B, P::Result) -> G,
     ) -> Goal<I>
@@ -114,7 +114,7 @@ impl<'i, I: Interner> GoalBuilder<'i, I> {
     fn quantified<G, B, P>(
         &mut self,
         quantifier_kind: QuantifierKind,
-        binders: &Binders<B>,
+        binders: &Binders<I, B>,
         passthru: P,
         body: fn(&mut Self, Substitution<I>, &B, P::Result) -> G,
     ) -> Goal<I>
@@ -137,7 +137,7 @@ impl<'i, I: Interner> GoalBuilder<'i, I> {
             interner,
             binders
                 .binders
-                .iter()
+                .iter(interner)
                 .zip(0..)
                 .map(|p| p.to_parameter(interner)),
         );

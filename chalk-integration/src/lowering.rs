@@ -1,8 +1,8 @@
 use chalk_ir::cast::{Cast, Caster};
 use chalk_ir::interner::ChalkIr;
 use chalk_ir::{
-    self, AssocTypeId, BoundVar, DebruijnIndex, ImplId, QuantifiedWhereClauses, StructId,
-    Substitution, TraitId,
+    self, AssocTypeId, BoundVar, DebruijnIndex, ImplId, ParameterKinds, QuantifiedWhereClauses,
+    StructId, Substitution, TraitId,
 };
 use chalk_parse::ast::*;
 use chalk_rust_ir as rust_ir;
@@ -161,7 +161,7 @@ impl<'k> Env<'k> {
         })
     }
 
-    fn in_binders<I, T, OP>(&self, binders: I, op: OP) -> LowerResult<chalk_ir::Binders<T>>
+    fn in_binders<I, T, OP>(&self, binders: I, op: OP) -> LowerResult<chalk_ir::Binders<ChalkIr, T>>
     where
         I: IntoIterator<Item = chalk_ir::ParameterKind<Ident>>,
         I::IntoIter: ExactSizeIterator,
@@ -522,6 +522,7 @@ trait LowerWhereClauses {
 
 impl LowerTypeKind for StructDefn {
     fn lower_type_kind(&self) -> LowerResult<TypeKind> {
+        let interner = &ChalkIr;
         Ok(TypeKind {
             sort: TypeSort::Struct,
             name: self.name.str,
@@ -538,6 +539,7 @@ impl LowerWhereClauses for StructDefn {
 
 impl LowerTypeKind for TraitDefn {
     fn lower_type_kind(&self) -> LowerResult<TypeKind> {
+        let interner = &ChalkIr;
         let binders: Vec<_> = self.parameter_kinds.iter().map(|p| p.lower()).collect();
         Ok(TypeKind {
             sort: TypeSort::Trait,
@@ -751,6 +753,7 @@ trait LowerTraitBound {
 
 impl LowerTraitBound for TraitBound {
     fn lower(&self, env: &Env) -> LowerResult<rust_ir::TraitBound<ChalkIr>> {
+        let interner = &ChalkIr;
         let trait_id = env.lookup_trait(self.trait_name)?;
 
         let k = env.trait_kind(trait_id);
@@ -764,15 +767,15 @@ impl LowerTraitBound for TraitBound {
             .map(|a| Ok(a.lower(env)?))
             .collect::<LowerResult<Vec<_>>>()?;
 
-        if parameters.len() != k.binders.len() {
+        if parameters.len() != k.binders.len(interner) {
             Err(RustIrError::IncorrectNumberOfTypeParameters {
                 identifier: self.trait_name,
-                expected: k.binders.len(),
+                expected: k.binders.len(interner),
                 actual: parameters.len(),
             })?;
         }
 
-        for (binder, param) in k.binders.binders.iter().zip(parameters.iter()) {
+        for (binder, param) in k.binders.binders.iter(interner).zip(parameters.iter()) {
             if binder.kind() != param.kind() {
                 Err(RustIrError::IncorrectTraitParameterKind {
                     identifier: self.trait_name,
@@ -978,10 +981,10 @@ impl LowerTy for Ty {
             Ty::Id { name } => match env.lookup_type(name)? {
                 TypeLookup::Struct(id) => {
                     let k = env.struct_kind(id);
-                    if k.binders.len() > 0 {
+                    if k.binders.len(interner) > 0 {
                         Err(RustIrError::IncorrectNumberOfTypeParameters {
                             identifier: name,
-                            expected: k.binders.len(),
+                            expected: k.binders.len(interner),
                             actual: 0,
                         })
                     } else {
@@ -1025,10 +1028,10 @@ impl LowerTy for Ty {
                 };
 
                 let k = env.struct_kind(id);
-                if k.binders.len() != args.len() {
+                if k.binders.len(interner) != args.len() {
                     Err(RustIrError::IncorrectNumberOfTypeParameters {
                         identifier: name,
-                        expected: k.binders.len(),
+                        expected: k.binders.len(interner),
                         actual: args.len(),
                     })?;
                 }
@@ -1038,7 +1041,7 @@ impl LowerTy for Ty {
                     args.iter().map(|t| Ok(t.lower(env)?)),
                 )?;
 
-                for (param, arg) in k.binders.binders.iter().zip(args.iter()) {
+                for (param, arg) in k.binders.binders.iter(interner).zip(args.iter()) {
                     if param.kind() != arg.kind() {
                         Err(RustIrError::IncorrectParameterKind {
                             identifier: name,
@@ -1201,7 +1204,10 @@ impl LowerClause for Clause {
         let clauses = implications
             .into_iter()
             .map(
-                |implication: chalk_ir::Binders<chalk_ir::ProgramClauseImplication<ChalkIr>>| {
+                |implication: chalk_ir::Binders<
+                    ChalkIr,
+                    chalk_ir::ProgramClauseImplication<ChalkIr>,
+                >| {
                     chalk_ir::ProgramClauseData::ForAll(implication).intern(interner)
                 },
             )
@@ -1267,14 +1273,16 @@ pub trait LowerGoal<A> {
 
 impl LowerGoal<LoweredProgram> for Goal {
     fn lower(&self, program: &LoweredProgram) -> LowerResult<chalk_ir::Goal<ChalkIr>> {
+        let interner = &ChalkIr;
         let associated_ty_lookups: BTreeMap<_, _> = program
             .associated_ty_data
             .iter()
             .map(|(&associated_ty_id, datum)| {
                 let trait_datum = &program.trait_data[&datum.trait_id];
-                let num_trait_params = trait_datum.binders.len();
-                let num_addl_params = datum.binders.len() - num_trait_params;
-                let addl_parameter_kinds = datum.binders.binders[..num_addl_params].to_owned();
+                let num_trait_params = trait_datum.binders.len(interner);
+                let num_addl_params = datum.binders.len(interner) - num_trait_params;
+                let addl_parameter_kinds =
+                    datum.binders.binders.as_slice(interner)[..num_addl_params].to_owned();
                 let lookup = AssociatedTyLookup {
                     id: associated_ty_id,
                     addl_parameter_kinds,

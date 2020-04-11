@@ -549,7 +549,7 @@ impl DebruijnIndex {
 /// level of binder).
 #[derive(Clone, PartialEq, Eq, Hash, Fold, Visit)]
 pub struct DynTy<I: Interner> {
-    pub bounds: Binders<QuantifiedWhereClauses<I>>,
+    pub bounds: Binders<I, QuantifiedWhereClauses<I>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -1000,7 +1000,7 @@ pub enum DomainGoal<I: Interner> {
     DownstreamType(Ty<I>),
 }
 
-pub type QuantifiedWhereClause<I> = Binders<WhereClause<I>>;
+pub type QuantifiedWhereClause<I> = Binders<I, WhereClause<I>>;
 
 impl<I: Interner> WhereClause<I> {
     /// Turn a where clause into the WF version of it i.e.:
@@ -1028,7 +1028,7 @@ impl<I: Interner> QuantifiedWhereClause<I> {
     /// quantified where clause. For example, `forall<T> {
     /// Implemented(T: Trait)}` would map to `forall<T> {
     /// WellFormed(T: Trait) }`.
-    pub fn into_well_formed_goal(self, interner: &I) -> Binders<DomainGoal<I>> {
+    pub fn into_well_formed_goal(self, interner: &I) -> Binders<I, DomainGoal<I>> {
         self.map(|wc| wc.into_well_formed_goal(interner))
     }
 
@@ -1036,7 +1036,7 @@ impl<I: Interner> QuantifiedWhereClause<I> {
     /// binders. For example, `forall<T> {
     /// Implemented(T: Trait)}` would map to `forall<T> {
     /// FromEnv(T: Trait) }`.
-    pub fn into_from_env_goal(self, interner: &I) -> Binders<DomainGoal<I>> {
+    pub fn into_from_env_goal(self, interner: &I) -> Binders<I, DomainGoal<I>> {
         self.map(|wc| wc.into_from_env_goal(interner))
     }
 }
@@ -1144,14 +1144,14 @@ impl<I: Interner> HasInterner for AliasEq<I> {
 ///
 /// (IOW, we use deBruijn indices, where binders are introduced in reverse order
 /// of `self.binders`.)
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Binders<T> {
-    pub binders: Vec<ParameterKind<()>>,
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Binders<I: Interner, T> {
+    pub binders: ParameterKinds<I>,
     value: T,
 }
 
-impl<T: HasInterner> HasInterner for Binders<T> {
-    type Interner = T::Interner;
+impl<I: Interner, T> HasInterner for Binders<I, T> {
+    type Interner = I;
 }
 
 impl<T> Binders<T> {
@@ -1195,7 +1195,7 @@ impl<T> Binders<T> {
         }
     }
 
-    pub fn map_ref<'a, U, OP>(&'a self, op: OP) -> Binders<U>
+    pub fn map_ref<'a, U, OP>(&'a self, op: OP) -> Binders<I, U>
     where
         OP: FnOnce(&'a T) -> U,
     {
@@ -1208,7 +1208,7 @@ impl<T> Binders<T> {
     /// from the closure to account for the binder that will be added.
     ///
     /// XXX FIXME -- this is potentially a pretty footgun-y function.
-    pub fn with_fresh_type_var<I>(interner: &I, op: impl FnOnce(Ty<I>) -> T) -> Binders<T>
+    pub fn with_fresh_type_var(interner: &I, op: impl FnOnce(Ty<I>) -> T) -> Binders<I, T>
     where
         I: Interner,
     {
@@ -1216,14 +1216,12 @@ impl<T> Binders<T> {
         let new_var =
             TyData::<I>::BoundVar(BoundVar::new(DebruijnIndex::INNERMOST, 0)).intern(interner);
         let value = op(new_var);
-        Binders {
-            binders: iter::once(ParameterKind::Ty(())).collect(),
-            value,
-        }
+        let binders = ParameterKinds::from(interner, iter::once(ParameterKind::Ty(())));
+        Binders { binders, value }
     }
 
-    pub fn len(&self) -> usize {
-        self.binders.len()
+    pub fn len(&self, interner: &I) -> usize {
+        self.binders.len(interner)
     }
 }
 
@@ -1248,20 +1246,21 @@ where
         parameters: &(impl AsParameters<I> + ?Sized),
     ) -> T::Result {
         let parameters = parameters.as_parameters(interner);
-        assert_eq!(self.binders.len(), parameters.len());
+        assert_eq!(self.binders.len(interner), parameters.len());
         Subst::apply(interner, parameters, &self.value)
     }
 }
 
 /// Allows iterating over a `&Binders<Vec<T>>`, for instance. Each
 /// element will be a `Binders<&T>`.
-impl<'a, V> IntoIterator for &'a Binders<V>
+impl<'a, I, V> IntoIterator for &'a Binders<I, V>
 where
-    V: HasInterner,
+    I: Interner,
+    V: HasInterner<Interner = I>,
     &'a V: IntoIterator,
 {
-    type Item = Binders<<&'a V as IntoIterator>::Item>;
-    type IntoIter = BindersIntoIterator<&'a V>;
+    type Item = Binders<I, <&'a V as IntoIterator>::Item>;
+    type IntoIter = BindersIntoIterator<I, &'a V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map_ref(|r| r).into_iter()
@@ -1270,9 +1269,9 @@ where
 
 /// Allows iterating over a Binders<Vec<T>>, for instance.
 /// Each element will include the same set of parameter bounds.
-impl<V: IntoIterator> IntoIterator for Binders<V> {
-    type Item = Binders<<V as IntoIterator>::Item>;
-    type IntoIter = BindersIntoIterator<V>;
+impl<I: Interner, V: IntoIterator> IntoIterator for Binders<I, V> {
+    type Item = Binders<I, <V as IntoIterator>::Item>;
+    type IntoIter = BindersIntoIterator<I, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         BindersIntoIterator {
@@ -1282,13 +1281,13 @@ impl<V: IntoIterator> IntoIterator for Binders<V> {
     }
 }
 
-pub struct BindersIntoIterator<V: IntoIterator> {
+pub struct BindersIntoIterator<I: Interner, V: IntoIterator> {
     iter: <V as IntoIterator>::IntoIter,
-    binders: Vec<ParameterKind<()>>,
+    binders: ParameterKinds<I>,
 }
 
-impl<V: IntoIterator> Iterator for BindersIntoIterator<V> {
-    type Item = Binders<<V as IntoIterator>::Item>;
+impl<I: Interner, V: IntoIterator> Iterator for BindersIntoIterator<I, V> {
+    type Item = Binders<I, <V as IntoIterator>::Item>;
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|v| Binders {
             binders: self.binders.clone(),
@@ -1309,7 +1308,7 @@ pub struct ProgramClauseImplication<I: Interner> {
 #[derive(Clone, PartialEq, Eq, Hash, Fold, HasInterner)]
 pub enum ProgramClauseData<I: Interner> {
     Implies(ProgramClauseImplication<I>),
-    ForAll(Binders<ProgramClauseImplication<I>>),
+    ForAll(Binders<I, ProgramClauseImplication<I>>),
 }
 
 impl<I: Interner> ProgramClauseImplication<I> {
@@ -1492,7 +1491,10 @@ impl<I: Interner> ParameterKindsWithUniverseIndex<I> {
         parameter_kinds: impl IntoIterator<Item = ParameterKind<UniverseIndex>>,
     ) -> Self {
         ParameterKindsWithUniverseIndex {
-            interned: I::intern_parameter_kinds_with_universe_index(interner, parameter_kinds.into_iter()),
+            interned: I::intern_parameter_kinds_with_universe_index(
+                interner,
+                parameter_kinds.into_iter(),
+            ),
         }
     }
 
@@ -1523,7 +1525,6 @@ impl<I: Interner> ParameterKindsWithUniverseIndex<I> {
     }
 }
 
-
 /// Wraps a "canonicalized item". Items are canonicalized as follows:
 ///
 /// All unresolved existential variables are "renumbered" according to their
@@ -1535,8 +1536,7 @@ pub struct Canonical<I: Interner, T> {
     pub binders: ParameterKindsWithUniverseIndex<I>,
 }
 
-impl<I: Interner, T> HasInterner for Canonical<I, T>
-{
+impl<I: Interner, T> HasInterner for Canonical<I, T> {
     type Interner = I;
 }
 
@@ -1552,7 +1552,7 @@ pub struct UCanonical<I: Interner, T> {
     pub universes: usize,
 }
 
-impl<I:Interner, T> UCanonical<I, T> {
+impl<I: Interner, T> UCanonical<I, T> {
     pub fn is_trivial_substitution(
         &self,
         interner: &I,
@@ -1642,7 +1642,7 @@ impl<I: Interner> Goal<I> {
         self,
         interner: &I,
         kind: QuantifierKind,
-        binders: Vec<ParameterKind<()>>,
+        binders: ParameterKinds<I>,
     ) -> Goal<I> {
         GoalData::Quantified(
             kind,
@@ -1726,7 +1726,7 @@ where
 pub enum GoalData<I: Interner> {
     /// Introduces a binding at depth 0, shifting other bindings up
     /// (deBruijn index).
-    Quantified(QuantifierKind, Binders<Goal<I>>),
+    Quantified(QuantifierKind, Binders<I, Goal<I>>),
     Implies(ProgramClauses<I>, Goal<I>),
     All(Goals<I>),
     Not(Goal<I>),

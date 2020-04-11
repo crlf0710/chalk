@@ -48,7 +48,7 @@ where
                 Ok(())
             }
 
-            fn zip_binders<T>(&mut self, a: &Binders<T>, b: &Binders<T>) -> Fallible<()>
+            fn zip_binders<T>(&mut self, a: &Binders<I, T>, b: &Binders<I, T>) -> Fallible<()>
             where
                 T: Zip<I>,
             {

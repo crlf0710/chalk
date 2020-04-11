@@ -21,7 +21,7 @@ impl<I: Interner> Visit<I> for Fn<I> {
     }
 }
 
-impl<T, I: Interner> Visit<I> for Binders<T>
+impl<T, I: Interner> Visit<I> for Binders<I, T>
 where
     T: Visit<I>,
 {
