@@ -554,10 +554,30 @@ impl<I: Interner> Debug for Environment<I> {
     }
 }
 
-impl<T: Display> Display for Canonical<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let Canonical { binders, value } = self;
+impl<I: Interner> Debug for ParameterKindsWithUniverseIndex<I> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
+        I::debug_parameter_kinds_with_universe_index(self, fmt)
+            .unwrap_or_else(|| write!(fmt, "{:?}", self.interned))
+    }
+}
 
+impl<I: Interner, T: Display> Canonical<I, T> {
+    pub fn display<'a>(&'a self, interner: &'a I) -> CanonicalDisplay<'a, I, T> {
+        CanonicalDisplay {
+            canonical: self,
+            interner,
+        }
+    }
+}
+
+pub trait DisplayWithInterner<I: Interner> {
+    fn fmt_with_interner(&self, interner: &I, f: &mut Formatter<'_>) -> Result<(), Error>;
+}
+
+impl<I: Interner, T: Display> DisplayWithInterner<I> for Canonical<I, T>{
+    fn fmt_with_interner(&self, interner: &I, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let Canonical { binders, value } = self;
+        let binders = binders.as_slice(interner);
         if binders.is_empty() {
             // Ordinarily, we try to print all binder levels, if they
             // are empty, but we can skip in this *particular* case
@@ -580,6 +600,17 @@ impl<T: Display> Display for Canonical<T> {
         }
 
         Ok(())
+    }
+}
+
+pub struct CanonicalDisplay<'a, I: Interner, T> {
+    canonical: &'a Canonical<I, T>,
+    interner: &'a I,
+}
+
+impl<'a, I: Interner, T: Display> Display for CanonicalDisplay<'a, I, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        DisplayWithInterner::fmt_with_interner(self.canonical, self.interner, f)
     }
 }
 

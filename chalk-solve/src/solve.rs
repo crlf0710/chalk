@@ -14,7 +14,7 @@ pub enum Solution<I: Interner> {
     /// The goal indeed holds, and there is a unique value for all existential
     /// variables. In this case, we also record a set of lifetime constraints
     /// which must also hold for the goal to be valid.
-    Unique(Canonical<ConstrainedSubst<I>>),
+    Unique(Canonical<I, ConstrainedSubst<I>>),
 
     /// The goal may be provable in multiple ways, but regardless we may have some guidance
     /// for type inference. In this case, we don't return any lifetime
@@ -30,12 +30,12 @@ pub enum Guidance<I: Interner> {
     /// The existential variables *must* have the given values if the goal is
     /// ever to hold, but that alone isn't enough to guarantee the goal will
     /// actually hold.
-    Definite(Canonical<Substitution<I>>),
+    Definite(Canonical<I, Substitution<I>>),
 
     /// There are multiple plausible values for the existentials, but the ones
     /// here are suggested as the preferred choice heuristically. These should
     /// be used for inference fallback only.
-    Suggested(Canonical<Substitution<I>>),
+    Suggested(Canonical<I, Substitution<I>>),
 
     /// There's no useful information to feed back to type inference
     Unknown,
@@ -48,18 +48,35 @@ impl<I: Interner> Solution<I> {
             _ => false,
         }
     }
+
+    pub fn display<'a>(&'a self, interner: &'a I) -> SolutionDisplay<'a, I> {
+        SolutionDisplay {
+            solution: self,
+            interner,
+        }
+    }
 }
 
-impl<I: Interner> fmt::Display for Solution<I> {
+pub struct SolutionDisplay<'a, I: Interner> {
+    solution: &'a Solution<I>,
+    interner: &'a I,
+}
+
+impl<'a, I: Interner> fmt::Display for SolutionDisplay<'a, I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        match self {
-            Solution::Unique(constrained) => write!(f, "Unique; {}", constrained,),
-            Solution::Ambig(Guidance::Definite(subst)) => {
-                write!(f, "Ambiguous; definite substitution {}", subst)
-            }
-            Solution::Ambig(Guidance::Suggested(subst)) => {
-                write!(f, "Ambiguous; suggested substitution {}", subst)
-            }
+        let SolutionDisplay { solution, interner } = self;
+        match solution {
+            Solution::Unique(constrained) => write!(f, "Unique; {}", constrained.display(interner)),
+            Solution::Ambig(Guidance::Definite(subst)) => write!(
+                f,
+                "Ambiguous; definite substitution {}",
+                subst.display(interner)
+            ),
+            Solution::Ambig(Guidance::Suggested(subst)) => write!(
+                f,
+                "Ambiguous; suggested substitution {}",
+                subst.display(interner)
+            ),
             Solution::Ambig(Guidance::Unknown) => write!(f, "Ambiguous; no inference guidance"),
         }
     }
@@ -132,7 +149,7 @@ impl<I: Interner> Solver<I> {
     pub fn solve(
         &mut self,
         program: &dyn RustIrDatabase<I>,
-        goal: &UCanonical<InEnvironment<Goal<I>>>,
+        goal: &UCanonical<I, InEnvironment<Goal<I>>>,
     ) -> Option<Solution<I>> {
         let ops = self.forest.context().ops(program);
         self.forest.solve(&ops, goal, || true)
@@ -163,7 +180,7 @@ impl<I: Interner> Solver<I> {
     pub fn solve_limited(
         &mut self,
         program: &dyn RustIrDatabase<I>,
-        goal: &UCanonical<InEnvironment<Goal<I>>>,
+        goal: &UCanonical<I, InEnvironment<Goal<I>>>,
         should_continue: impl std::ops::Fn() -> bool,
     ) -> Option<Solution<I>> {
         let ops = self.forest.context().ops(program);
@@ -195,8 +212,8 @@ impl<I: Interner> Solver<I> {
     pub fn solve_multiple(
         &mut self,
         program: &dyn RustIrDatabase<I>,
-        goal: &UCanonical<InEnvironment<Goal<I>>>,
-        f: impl FnMut(SubstitutionResult<Canonical<ConstrainedSubst<I>>>, bool) -> bool,
+        goal: &UCanonical<I, InEnvironment<Goal<I>>>,
+        f: impl FnMut(SubstitutionResult<Canonical<I, ConstrainedSubst<I>>>, bool) -> bool,
     ) -> bool {
         let ops = self.forest.context().ops(program);
         self.forest.solve_multiple(&ops, goal, f)

@@ -207,8 +207,8 @@ impl<I: Interner> context::ResolventOps<SlgContext<I>> for TruncatingInferenceTa
         interner: &I,
         ex_clause: &mut ExClause<SlgContext<I>>,
         selected_goal: &InEnvironment<Goal<I>>,
-        answer_table_goal: &Canonical<InEnvironment<Goal<I>>>,
-        canonical_answer_subst: &Canonical<AnswerSubst<I>>,
+        answer_table_goal: &Canonical<I, InEnvironment<Goal<I>>>,
+        canonical_answer_subst: &Canonical<I, AnswerSubst<I>>,
     ) -> Fallible<()> {
         debug_heading!("apply_answer_subst()");
         debug!("ex_clause={:?}", ex_clause);

@@ -1,8 +1,9 @@
 use crate::interner::ChalkIr;
 use crate::{
     debug::SeparatorTraitRef, AliasTy, ApplicationTy, AssocTypeId, Goal, Goals, Lifetime,
-    Parameter, ProgramClause, ProgramClauseImplication, ProgramClauses, QuantifiedWhereClauses,
-    StructId, Substitution, TraitId, Ty,
+    Parameter, ParameterKinds, ParameterKindsWithUniverseIndex, ProgramClause,
+    ProgramClauseImplication, ProgramClauses, QuantifiedWhereClauses, StructId, Substitution,
+    TraitId, Ty,
 };
 use std::cell::RefCell;
 use std::fmt;
@@ -48,6 +49,18 @@ pub trait DebugContext {
     fn debug_parameter(
         &self,
         parameter: &Parameter<ChalkIr>,
+        fmt: &mut fmt::Formatter<'_>,
+    ) -> Result<(), fmt::Error>;
+
+    fn debug_parameter_kinds(
+        &self,
+        parameter_kinds: &ParameterKinds<ChalkIr>,
+        fmt: &mut fmt::Formatter<'_>,
+    ) -> Result<(), fmt::Error>;
+
+    fn debug_parameter_kinds_with_universe_index(
+        &self,
+        parameter_kinds: &ParameterKindsWithUniverseIndex<ChalkIr>,
         fmt: &mut fmt::Formatter<'_>,
     ) -> Result<(), fmt::Error>;
 

@@ -17,7 +17,7 @@ use std::fmt::Debug;
 impl<I: Interner> context::AggregateOps<SlgContext<I>> for SlgContextOps<'_, I> {
     fn make_solution(
         &self,
-        root_goal: &UCanonical<InEnvironment<Goal<I>>>,
+        root_goal: &UCanonical<I, InEnvironment<Goal<I>>>,
         mut answers: impl context::AnswerStream<SlgContext<I>>,
         should_continue: impl std::ops::Fn() -> bool,
     ) -> Option<Solution<I>> {
@@ -122,10 +122,10 @@ impl<I: Interner> context::AggregateOps<SlgContext<I>> for SlgContextOps<'_, I> 
 /// become `?0 = ?X` (where `?X` is some fresh variable).
 fn merge_into_guidance<I: Interner>(
     interner: &I,
-    root_goal: &Canonical<InEnvironment<Goal<I>>>,
-    guidance: Canonical<Substitution<I>>,
-    answer: &Canonical<ConstrainedSubst<I>>,
-) -> Canonical<Substitution<I>> {
+    root_goal: &Canonical<I, InEnvironment<Goal<I>>>,
+    guidance: Canonical<I, Substitution<I>>,
+    answer: &Canonical<I, ConstrainedSubst<I>>,
+) -> Canonical<I, Substitution<I>> {
     let mut infer = InferenceTable::new();
     let Canonical {
         value: ConstrainedSubst {
@@ -146,7 +146,7 @@ fn merge_into_guidance<I: Interner>(
             // We have two values for some variable X that
             // appears in the root goal. Find out the universe
             // of X.
-            let universe = root_goal.binders[index].into_inner();
+            let universe = root_goal.binders.as_slice(interner)[index].into_inner();
 
             let ty = match value.data(interner) {
                 ParameterKind::Ty(ty) => ty,
@@ -177,7 +177,7 @@ fn merge_into_guidance<I: Interner>(
     infer.canonicalize(interner, &aggr_subst).quantified
 }
 
-fn is_trivial<I: Interner>(interner: &I, subst: &Canonical<Substitution<I>>) -> bool {
+fn is_trivial<I: Interner>(interner: &I, subst: &Canonical<I, Substitution<I>>) -> bool {
     // A subst is trivial if..
     subst
         .value

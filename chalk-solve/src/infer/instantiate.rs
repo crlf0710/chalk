@@ -27,12 +27,12 @@ impl<I: Interner> InferenceTable<I> {
     pub(crate) fn instantiate_canonical<T>(
         &mut self,
         interner: &I,
-        bound: &Canonical<T>,
+        bound: &Canonical<I, T>,
     ) -> T::Result
     where
         T: Fold<I> + Debug,
     {
-        let subst = self.fresh_subst(interner, &bound.binders);
+        let subst = self.fresh_subst(interner, &bound.binders.as_slice(interner));
         subst.apply(&bound.value, interner)
     }
 
