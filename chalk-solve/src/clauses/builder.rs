@@ -56,7 +56,7 @@ impl<'me, I: Interner> ClauseBuilder<'me, I> {
         } else {
             self.clauses.push(
                 ProgramClauseData::ForAll(Binders {
-                    binders: self.binders.clone(),
+                    binders: ParameterKinds::from(interner, self.binders.clone()),
                     value: clause,
                 })
                 .intern(interner),
@@ -87,8 +87,11 @@ impl<'me, I: Interner> ClauseBuilder<'me, I> {
     /// The new binders are always pushed onto the end of the internal
     /// list of binders; this means that any extant values where were
     /// created referencing the *old* list of binders are still valid.
-    pub fn push_binders<V>(&mut self, binders: &Binders<V>, op: impl FnOnce(&mut Self, V::Result))
-    where
+    pub fn push_binders<V>(
+        &mut self,
+        binders: &Binders<I, V>,
+        op: impl FnOnce(&mut Self, V::Result),
+    ) where
         V: Fold<I> + HasInterner<Interner = I>,
         V::Result: std::fmt::Debug,
     {
@@ -96,11 +99,11 @@ impl<'me, I: Interner> ClauseBuilder<'me, I> {
 
         let old_len = self.binders.len();
         let interner = self.interner();
-        self.binders.extend(binders.binders.clone());
+        self.binders.extend(binders.binders.iter(interner).cloned());
         self.parameters.extend(
             binders
                 .binders
-                .iter()
+                .iter(interner)
                 .zip(old_len..)
                 .map(|p| p.to_parameter(interner)),
         );
@@ -122,7 +125,7 @@ impl<'me, I: Interner> ClauseBuilder<'me, I> {
     pub fn push_bound_ty(&mut self, op: impl FnOnce(&mut Self, Ty<I>)) {
         let interner = self.interner();
         let binders = Binders {
-            binders: vec![ParameterKind::Ty(())],
+            binders: ParameterKinds::from(interner, vec![ParameterKind::Ty(())]),
             value: PhantomData::<I>,
         };
         self.push_binders(&binders, |this, PhantomData| {

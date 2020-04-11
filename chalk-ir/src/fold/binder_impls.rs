@@ -28,12 +28,12 @@ impl<I: Interner, TI: TargetInterner<I>> Fold<I, TI> for Fn<I> {
     }
 }
 
-impl<T, I: Interner, TI: TargetInterner<I>> Fold<I, TI> for Binders<T>
+impl<T, I: Interner, TI: TargetInterner<I>> Fold<I, TI> for Binders<I, T>
 where
     T: Fold<I, TI>,
     I: Interner,
 {
-    type Result = Binders<T::Result>;
+    type Result = Binders<TI, T::Result>;
     fn fold_with<'i>(
         &self,
         folder: &mut dyn Folder<'i, I, TI>,
@@ -48,10 +48,10 @@ where
             value: self_value,
         } = self;
         let value = self_value.fold_with(folder, outer_binder.shifted_in())?;
-        Ok(Binders {
-            binders: self_binders.clone(),
-            value: value,
-        })
+        let binders = ParameterKinds {
+            interned: TI::transfer_parameter_kinds(self_binders.interned().clone()),
+        };
+        Ok(Binders { binders, value })
     }
 }
 

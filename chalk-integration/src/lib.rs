@@ -11,6 +11,7 @@ pub mod program;
 pub mod program_environment;
 pub mod query;
 
+use chalk_ir::interner::ChalkIr;
 pub use chalk_ir::interner::{Identifier, RawId};
 use chalk_ir::Binders;
 
@@ -24,5 +25,5 @@ pub enum TypeSort {
 pub struct TypeKind {
     pub sort: TypeSort,
     pub name: Identifier,
-    pub binders: Binders<()>,
+    pub binders: Binders<ChalkIr, ()>,
 }

@@ -480,7 +480,7 @@ impl<'i, I: Interner> Zipper<'i, I> for AnswerSubstitutor<'i, I> {
         }
     }
 
-    fn zip_binders<T>(&mut self, answer: &Binders<T>, pending: &Binders<T>) -> Fallible<()>
+    fn zip_binders<T>(&mut self, answer: &Binders<I, T>, pending: &Binders<I, T>) -> Fallible<()>
     where
         T: Zip<I> + Fold<I, Result = T>,
     {

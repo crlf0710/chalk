@@ -25,7 +25,7 @@ chalk_ir::id_fold!(AssociatedTyValueId);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ImplDatum<I: Interner> {
     pub polarity: Polarity,
-    pub binders: Binders<ImplDatumBound<I>>,
+    pub binders: Binders<I, ImplDatumBound<I>>,
     pub impl_type: ImplType,
     pub associated_ty_value_ids: Vec<AssociatedTyValueId<I>>,
 }
@@ -54,7 +54,7 @@ pub enum ImplType {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DefaultImplDatum<I: Interner> {
-    pub binders: Binders<DefaultImplDatumBound<I>>,
+    pub binders: Binders<I, DefaultImplDatumBound<I>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -65,7 +65,7 @@ pub struct DefaultImplDatumBound<I: Interner> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructDatum<I: Interner> {
-    pub binders: Binders<StructDatumBound<I>>,
+    pub binders: Binders<I, StructDatumBound<I>>,
     pub id: StructId<I>,
     pub flags: StructFlags,
 }
@@ -116,7 +116,7 @@ pub struct StructFlags {
 pub struct TraitDatum<I: Interner> {
     pub id: TraitId<I>,
 
-    pub binders: Binders<TraitDatumBound<I>>,
+    pub binders: Binders<I, TraitDatumBound<I>>,
 
     /// "Flags" indicate special kinds of traits, like auto traits.
     /// In Rust syntax these are represented in different ways, but in
@@ -205,7 +205,7 @@ pub enum InlineBound<I: Interner> {
 }
 
 #[allow(type_alias_bounds)]
-pub type QuantifiedInlineBound<I: Interner> = Binders<InlineBound<I>>;
+pub type QuantifiedInlineBound<I: Interner> = Binders<I, InlineBound<I>>;
 
 pub trait IntoWhereClauses<I: Interner> {
     type Output;
@@ -386,7 +386,7 @@ pub struct AssociatedTyDatum<I: Interner> {
     /// from `Bar` come first (corresponding to the de bruijn concept
     /// that "inner" binders are lower indices, although within a
     /// given binder we do not have an ordering).
-    pub binders: Binders<AssociatedTyDatumBound<I>>,
+    pub binders: Binders<I, AssociatedTyDatumBound<I>>,
 }
 
 /// Encodes the parts of `AssociatedTyDatum` where the parameters
@@ -419,7 +419,10 @@ impl<I: Interner> AssociatedTyDatum<I> {
         // scope for this associated type:
         let substitution = Substitution::from(
             interner,
-            binders.iter().zip(0..).map(|p| p.to_parameter(interner)),
+            binders
+                .iter(interner)
+                .zip(0..)
+                .map(|p| p.to_parameter(interner)),
         );
 
         // The self type will be `<P0 as Foo<P1..Pn>>::Item<Pn..Pm>` etc
@@ -487,7 +490,7 @@ pub struct AssociatedTyValue<I: Interner> {
     ///           // ^^^^ refers to these generics here
     /// }
     /// ```
-    pub value: Binders<AssociatedTyValueBound<I>>,
+    pub value: Binders<I, AssociatedTyValueBound<I>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Fold, Visit, HasInterner)]

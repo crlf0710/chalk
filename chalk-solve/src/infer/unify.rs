@@ -188,8 +188,8 @@ impl<'t, I: Interner> Unifier<'t, I> {
 
     fn unify_binders<T, R>(
         &mut self,
-        a: impl IntoBindersAndValue<Value = T> + Copy + Debug,
-        b: impl IntoBindersAndValue<Value = T> + Copy + Debug,
+        a: impl IntoBindersAndValue<I, Value = T> + Copy + Debug,
+        b: impl IntoBindersAndValue<I, Value = T> + Copy + Debug,
     ) -> Fallible<()>
     where
         T: Fold<I, Result = R>,
@@ -350,7 +350,7 @@ impl<'i, I: Interner> Zipper<'i, I> for Unifier<'i, I> {
         self.unify_lifetime_lifetime(a, b)
     }
 
-    fn zip_binders<T>(&mut self, a: &Binders<T>, b: &Binders<T>) -> Fallible<()>
+    fn zip_binders<T>(&mut self, a: &Binders<I, T>, b: &Binders<I, T>) -> Fallible<()>
     where
         T: Zip<I> + Fold<I, Result = T>,
     {
