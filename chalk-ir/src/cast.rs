@@ -140,7 +140,7 @@ impl<I: Interner> CastTo<Goal<I>> for EqGoal<I> {
     }
 }
 
-impl<T: CastTo<Goal<I>>, I: Interner> CastTo<Goal<I>> for Binders<T> {
+impl<T: HasInterner + CastTo<Goal<I>>, I: Interner> CastTo<Goal<I>> for Binders<T> {
     fn cast_to(self, interner: &I) -> Goal<I> {
         GoalData::Quantified(
             QuantifierKind::ForAll,
@@ -150,7 +150,7 @@ impl<T: CastTo<Goal<I>>, I: Interner> CastTo<Goal<I>> for Binders<T> {
     }
 }
 
-impl<I: Interner> CastTo<TyData<I>> for ApplicationTy<I> {
+impl<I: HasInterner + Interner> CastTo<TyData<I>> for ApplicationTy<I> {
     fn cast_to(self, _interner: &I) -> TyData<I> {
         TyData::Apply(self)
     }
@@ -196,7 +196,7 @@ where
 
 impl<T, I> CastTo<ProgramClause<I>> for Binders<T>
 where
-    T: CastTo<DomainGoal<I>>,
+    T: HasInterner + CastTo<DomainGoal<I>>,
     I: Interner,
 {
     fn cast_to(self, interner: &I) -> ProgramClause<I> {

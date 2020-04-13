@@ -187,22 +187,64 @@ impl<I: Interner> Debug for LifetimeData<I> {
     }
 }
 
+impl<I: Interner> ParameterKinds<I> {
+    fn debug(&self) -> ParameterKindsDebug<'_, I> {
+        ParameterKindsDebug(self)
+    }
+
+    pub fn inner_debug<'a>(&'a self, interner: &'a I) -> ParameterKindsInnerDebug<'a, I> {
+        ParameterKindsInnerDebug {
+            parameter_kinds: self,
+            interner,
+        }
+    }
+}
+
+struct ParameterKindsDebug<'a, I: Interner>(&'a ParameterKinds<I>);
+
+impl<'a, I: Interner> Debug for ParameterKindsDebug<'a, I> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
+        I::debug_parameter_kinds_with_angles(self.0, fmt)
+            .unwrap_or_else(|| write!(fmt, "{:?}", self.0.interned))
+    }
+}
+
+pub struct ParameterKindsInnerDebug<'a, I: Interner> {
+    parameter_kinds: &'a ParameterKinds<I>,
+    interner: &'a I,
+}
+
+impl<'a, I: Interner> Debug for ParameterKindsInnerDebug<'a, I> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
+        // NB: We always print the `for<>`, even if it is empty,
+        // because it may affect the debruijn indices of things
+        // contained within. For example, `for<> { ^1.0 }` is very
+        // different from `^1.0` in terms of what variable is being
+        // referenced.
+        write!(fmt, "<")?;
+        for (index, binder) in self.parameter_kinds.iter(self.interner).enumerate() {
+            if index > 0 {
+                write!(fmt, ", ")?;
+            }
+            match *binder {
+                ParameterKind::Ty(()) => write!(fmt, "type")?,
+                ParameterKind::Lifetime(()) => write!(fmt, "lifetime")?,
+            }
+        }
+        write!(fmt, ">")
+    }
+}
+
 impl<I: Interner> Debug for GoalData<I> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            GoalData::Quantified(qkind, ref subgoal) => {
-                write!(fmt, "{:?}<", qkind)?;
-                for (index, binder) in subgoal.binders.iter().enumerate() {
-                    if index > 0 {
-                        write!(fmt, ", ")?;
-                    }
-                    match *binder {
-                        ParameterKind::Ty(()) => write!(fmt, "type")?,
-                        ParameterKind::Lifetime(()) => write!(fmt, "lifetime")?,
-                    }
-                }
-                write!(fmt, "> {{ {:?} }}", subgoal.value)
-            }
+            GoalData::Quantified(qkind, ref subgoal) => write!(
+                fmt,
+                "{:?}{:?} {{ {:?} }}",
+                qkind,
+                subgoal.binders.debug(),
+                subgoal.value
+            ),
             GoalData::Implies(ref wc, ref g) => write!(fmt, "if ({:?}) {{ {:?} }}", wc, g),
             GoalData::All(ref goals) => write!(fmt, "all{:?}", goals),
             GoalData::Not(ref g) => write!(fmt, "not {{ {:?} }}", g),
@@ -511,30 +553,13 @@ impl<I: Interner> Debug for EqGoal<I> {
     }
 }
 
-impl<T: Debug> Debug for Binders<T> {
+impl<T: HasInterner + Debug> Debug for Binders<T> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
         let Binders {
             ref binders,
             ref value,
         } = *self;
-
-        // NB: We always print the `for<>`, even if it is empty,
-        // because it may affect the debruijn indices of things
-        // contained within. For example, `for<> { ^1.0 }` is very
-        // different from `^1.0` in terms of what variable is being
-        // referenced.
-
-        write!(fmt, "for<")?;
-        for (index, binder) in binders.iter().enumerate() {
-            if index > 0 {
-                write!(fmt, ", ")?;
-            }
-            match *binder {
-                ParameterKind::Ty(()) => write!(fmt, "type")?,
-                ParameterKind::Lifetime(()) => write!(fmt, "lifetime")?,
-            }
-        }
-        write!(fmt, "> ")?;
+        write!(fmt, "for{:?} ", binders.debug())?;
         Debug::fmt(value, fmt)
     }
 }
@@ -570,13 +595,15 @@ impl<I: Interner, T: Display> Canonical<I, T> {
     }
 }
 
-pub trait DisplayWithInterner<I: Interner> {
-    fn fmt_with_interner(&self, interner: &I, f: &mut Formatter<'_>) -> Result<(), Error>;
+pub struct CanonicalDisplay<'a, I: Interner, T> {
+    canonical: &'a Canonical<I, T>,
+    interner: &'a I,
 }
 
-impl<I: Interner, T: Display> DisplayWithInterner<I> for Canonical<I, T>{
-    fn fmt_with_interner(&self, interner: &I, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let Canonical { binders, value } = self;
+impl<'a, I: Interner, T: Display> Display for CanonicalDisplay<'a, I, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let Canonical { binders, value } = self.canonical;
+        let interner = self.interner;
         let binders = binders.as_slice(interner);
         if binders.is_empty() {
             // Ordinarily, we try to print all binder levels, if they
@@ -600,17 +627,6 @@ impl<I: Interner, T: Display> DisplayWithInterner<I> for Canonical<I, T>{
         }
 
         Ok(())
-    }
-}
-
-pub struct CanonicalDisplay<'a, I: Interner, T> {
-    canonical: &'a Canonical<I, T>,
-    interner: &'a I,
-}
-
-impl<'a, I: Interner, T: Display> Display for CanonicalDisplay<'a, I, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        DisplayWithInterner::fmt_with_interner(self.canonical, self.interner, f)
     }
 }
 
